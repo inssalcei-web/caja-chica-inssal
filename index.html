@@ -3,18 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <script>
-    // GAS sirve dentro de iframe que puede ignorar el meta viewport.
-    // Este script fuerza el viewport correcto en el documento real.
-    (function(){
-      var mv = document.querySelector('meta[name="viewport"]');
-      if(mv){ mv.setAttribute('content','width=device-width,initial-scale=1.0,viewport-fit=cover'); }
-      // Detectar si estamos dentro de un iframe de GAS y escalar el body
-      if(window.self !== window.top){
-        document.documentElement.style.fontSize = '16px';
-      }
-    })();
-  </script>
+
   <title>Caja Chica Inssal Ltda</title>
   <meta name="description" content="Control de caja chica multiusuario con periodos contables, informes PDF y acceso por perfil." />
 
@@ -221,7 +210,6 @@
 
     /* ══ LAYOUT ════════════════════════════════════════════════ */
     main{padding:1rem 0 3rem;}
-    /* MOBILE FIRST: columna única por defecto, 2 cols solo en desktop */
     .hero{display:grid;gap:var(--space-5);margin-bottom:var(--space-6);grid-template-columns:1fr;}
     .hero-card,.panel{
       background:var(--color-surface);
@@ -487,44 +475,7 @@
       html{scroll-behavior:auto;}
     }
   </style>
-  <script>
-    // ═══════════════════════════════════════════════════════════
-    // FIX RESPONSIVE PARA GAS IFRAME
-    // Google Apps Script sirve el HTML dentro de un iframe con
-    // ancho fijo. Este script detecta esa situación y fuerza
-    // que el contenido use el 100% del ancho disponible.
-    // ═══════════════════════════════════════════════════════════
-    (function() {
-      function fixViewport() {
-        var w = document.documentElement.clientWidth || window.innerWidth;
-        var body = document.body;
-        var html = document.documentElement;
 
-        // Forzar que html y body usen el ancho real disponible
-        html.style.width  = '100%';
-        html.style.minWidth = '0';
-        body.style.width  = '100%';
-        body.style.minWidth = '0';
-        body.style.overflowX = 'hidden';
-
-        // Si el ancho detectado es muy pequeño (iframe de GAS sin escalar),
-        // no hay nada más que hacer desde JS — el CSS ya está en columna única.
-        // Pero aseguramos que font-size base sea siempre 16px.
-        if (!body.style.fontSize) {
-          body.style.fontSize = '16px';
-        }
-      }
-
-      // Ejecutar al cargar
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', fixViewport);
-      } else {
-        fixViewport();
-      }
-      // Y también al redimensionar
-      window.addEventListener('resize', fixViewport);
-    })();
-  </script>
 </head>
 <body>
 
@@ -842,34 +793,37 @@
   </div>
   <script>
     // ════════════════════════════════════════════════════════════
-    // CAPA DE COMUNICACIÓN — google.script.run
+    // CAPA DE COMUNICACIÓN — fetch hacia GAS
     // Envuelve cada llamada en una
     // Promise para mantener el mismo patrón .then/.catch del resto
     // del código, sin necesidad de reescribir la lógica de negocio.
     // ════════════════════════════════════════════════════════════
-    function gasRun(fnName, params) {
-      return new Promise(function(resolve, reject) {
-        google.script.run
-          .withSuccessHandler(function(result) {
-            try {
-              // GAS puede devolver string JSON o el objeto directo
-              var data = (typeof result === 'string') ? JSON.parse(result) : result;
-              resolve(data);
-            } catch (e) {
-              reject(new Error('Respuesta no válida del servidor.'));
-            }
-          })
-          .withFailureHandler(function(err) {
-            reject(new Error(err.message || 'Error en el servidor.'));
-          })
-          [fnName](params);
+    // ── URL del GAS — reemplaza con tu URL de deployment ──────
+    var GAS_URL = 'https://script.google.com/macros/s/AKfycbycA0yB9DziI2ZvJEy6ZMiQMhAyjnYPqBREB5dGVDcGAbi4a-FH0CFxpUHWKN99jvU/exec';
+
+    function gasCall(params) {
+      var url = new URL(GAS_URL);
+      Object.keys(params).forEach(function(k) {
+        url.searchParams.append(k, params[k]);
       });
+      return fetch(url.toString(), { redirect: 'follow' })
+        .then(function(r) {
+          if (!r.ok) throw new Error('Error de red: ' + r.status);
+          return r.json();
+        });
     }
 
-    // Alias de compatibilidad — el resto del código sigue usando
-    // gasCall / gasPost sin cambios
-    function gasCall(params)  { return gasRun('dispatchGet',  params); }
-    function gasPost(params)  { return gasRun('dispatchPost', params); }
+    function gasPost(params) {
+      return fetch(GAS_URL, {
+        method: 'POST',
+        redirect: 'follow',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(params).toString()
+      }).then(function(r) {
+        if (!r.ok) throw new Error('Error de red: ' + r.status);
+        return r.json();
+      });
+    }
 
     // ── ESTADO GLOBAL ────────────────────────────────────────────
     var movimientos       = [];
