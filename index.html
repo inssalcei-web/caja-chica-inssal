@@ -234,6 +234,7 @@
         color-mix(in srgb,var(--color-primary) 8%,var(--color-surface)),var(--color-surface));
     }
     .summary__value{font-size:clamp(1.25rem,2vw,1.75rem);font-weight:700;line-height:1;}
+    .summary__value--negativo{color:var(--color-error);}
     .summary__label{color:var(--color-text-muted);font-size:var(--text-xs);}
     .summary__group{
       padding:var(--space-3) var(--space-4);border-radius:var(--radius-lg);
@@ -572,6 +573,10 @@
           <div class="periodo-info" id="periodoInfo"><i class="fa-solid fa-calendar-check"></i> <span id="periodoLabel">Cargando…</span></div>
         </article>
         <aside class="summary panel" aria-label="Resumen del fondo">
+          <div class="summary__group" style="border-left:3px solid var(--color-success);">
+            <div class="summary__label"><i class="fa-solid fa-play-circle" style="margin-right:4px;"></i>Saldo inicial del período</div>
+            <div class="summary__value" id="saldoInicialPanel">$0</div>
+          </div>
           <div class="summary__group">
             <div class="summary__label">Saldo actual (período)</div>
             <div class="summary__value" id="saldoActual">$0</div>
@@ -1196,7 +1201,14 @@
         }
       });
       var saldo = saldoInicial + totalIn - totalOut;
-      document.getElementById('saldoActual').textContent          = formatMoney(saldo);
+      document.getElementById('saldoInicialPanel').textContent    = formatMoney(saldoInicial);
+      var elSaldo = document.getElementById('saldoActual');
+      elSaldo.textContent = formatMoney(saldo);
+      if (saldo < 0) {
+        elSaldo.classList.add('summary__value--negativo');
+      } else {
+        elSaldo.classList.remove('summary__value--negativo');
+      }
       document.getElementById('totalIngresos').textContent        = formatMoney(totalIn);
       document.getElementById('totalEgresos').textContent         = formatMoney(totalOut);
       document.getElementById('totalEgresosEfectivo').textContent = formatMoney(totalEfectivo);
@@ -1277,9 +1289,7 @@
       if (!fecha || monto <= 0 || !codigo || !cat || !detalle || !origen) {
         showStatus('Completa todos los campos, incluyendo el origen del gasto.'); return;
       }
-      if (monto > getSaldoActual()) {
-        showStatus('El egreso no puede superar el saldo disponible.'); return;
-      }
+
       var mov = {
         tipo: 'egreso', fecha: fecha, monto: monto,
         codigoProyecto: codigo, categoria: cat, detalle: detalle,
